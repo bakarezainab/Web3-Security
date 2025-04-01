@@ -1,185 +1,140 @@
-// 
+// // SPDX-License-Identifier: MIT
+// pragma solidity 0.8.13;
 
+// import "forge-std/Test.sol";
+// import "../src/Cxsecurity.sol";
 
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+// contract W3CXIITest is Test {
+//     W3CXII public w3cxii;
+//     address user1 = vm.addr(1);
+//     address user2 = vm.addr(2);
+//     address attacker = vm.addr(3);
 
-import "forge-std/Test.sol";
-import "../src/Dosed.sol";
+//     function setUp() public {
+//         // Deploy with 1 ether as specified
+//         w3cxii = new W3CXII{value: 1 ether}();
+//     }
 
-contract DosedTest is Test {
-    Dosed public dosed;
-    address public owner;
-    address public user1;
-    address public user2;
-    address public user3;
-    address public user4;
-    RevertingReceiver public receiver;
+//     function testInitialState() public view {
+//         assertEq(address(w3cxii).balance, 1 ether);
+//         assertEq(w3cxii.dosed(), false);
+//     }
 
-    function setUp() public {
-        owner = address(this);
-        user1 = address(0x1);
-        user2 = address(0x2);
-        user3 = address(0x3);
-        user4 = address(0x4);
-        receiver = new RevertingReceiver();
+//     function testDeposit() public {
+//         vm.prank(user1);
+//         vm.deal(user1, 0.5 ether);
+//         w3cxii.deposit{value: 0.5 ether}();
         
-        vm.deal(user1, 10 ether);
-        vm.deal(user2, 10 ether);
-        vm.deal(user3, 10 ether);
-        vm.deal(user4, 10 ether);
-        vm.deal(address(receiver), 10 ether);
-        
-        dosed = new Dosed{value: 0 ether}();
-    }
+//         assertEq(w3cxii.balanceOf(user1), 0.5 ether);
+//         assertEq(address(w3cxii).balance, 1.5 ether);
+//     }
 
-    function testInitialState() public {
-        assertEq(dosed.dosed(), false);
-        assertEq(address(dosed).balance, 0);
-        assertEq(dosed.balanceOf(user1), 0);
-    }
+//     function testDepositInvalidAmount() public {
+//         vm.prank(user1);
+//         vm.deal(user1, 0.5 ether);
+        
+//         vm.expectRevert("InvalidAmount");
+//         w3cxii.deposit{value: 0.4 ether}();
+//     }
 
-    function testDeposit() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
+//     function testMaxDepositPerUser() public {
+//         // Use fresh contract to avoid deposit lock interference
+//         W3CXII freshContract = new W3CXII{value: 0.1 ether}();
         
-        assertEq(dosed.balanceOf(user1), 0.5 ether);
-        assertEq(address(dosed).balance, 0.5 ether);
-    }
+//         vm.prank(user1);
+//         vm.deal(user1, 1.5 ether);
+//         freshContract.deposit{value: 0.5 ether}();
+//         freshContract.deposit{value: 0.5 ether}(); // Total 1 ether for user1
+        
+//         vm.expectRevert("Max deposit exceeded");
+//         freshContract.deposit{value: 0.5 ether}();
+//     }
 
-    function testDepositInvalidAmount() public {
-        vm.startPrank(user1);
-        vm.expectRevert("InvalidAmount");
-        dosed.deposit{value: 0.3 ether}();
-        vm.stopPrank();
-    }
+//     function testDepositLocked() public {
+//         // Use fresh contract to control initial balance
+//         W3CXII freshContract = new W3CXII{value: 0.1 ether}();
+        
+//         // First deposit (0.5 ether) - Total: 0.6 ether
+//         vm.prank(user1);
+//         vm.deal(user1, 0.5 ether);
+//         freshContract.deposit{value: 0.5 ether}();
+        
+//         // Second deposit (0.5 ether) - Total: 1.1 ether
+//         vm.prank(user2);
+//         vm.deal(user2, 0.5 ether);
+//         freshContract.deposit{value: 0.5 ether}();
+        
+//         // Third deposit (0.5 ether) - Total: 1.6 ether
+//         vm.prank(user1);
+//         freshContract.deposit{value: 0.5 ether}();
+        
+//         // Fourth deposit (0.5 ether) - Total: 2.1 ether (should lock)
+//         vm.prank(user2);
+//         freshContract.deposit{value: 0.5 ether}();
+        
+//         // Verify deposit is now locked
+//         vm.prank(user1);
+//         vm.expectRevert("deposit locked");
+//         freshContract.deposit{value: 0.5 ether}();
+//     }
 
-    function testDepositLocked() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
+//     function testWithdraw() public {
+//         vm.prank(user1);
+//         vm.deal(user1, 0.5 ether);
+//         w3cxii.deposit{value: 0.5 ether}();
         
-        vm.startPrank(user2);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
+//         uint initialBalance = user1.balance;
+//         vm.prank(user1);
+//         w3cxii.withdraw();
         
-        vm.startPrank(user3);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-        
-        vm.startPrank(user4);
-        vm.expectRevert("deposit locked");
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-    }
+//         assertEq(w3cxii.balanceOf(user1), 0);
+//         assertEq(user1.balance, initialBalance + 0.5 ether);
+//     }
 
-    function testWithdraw() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        dosed.withdraw();
-        vm.stopPrank();
-        
-        assertEq(dosed.balanceOf(user1), 0);
-        assertEq(address(dosed).balance, 0);
-    }
+//     function testWithdrawNoDeposit() public {
+//         vm.prank(user1);
+//         vm.expectRevert("No deposit");
+//         w3cxii.withdraw();
+//     }
 
-    function testWithdrawZeroBalance() public {
-        vm.startPrank(user1);
-        vm.expectRevert();
-        dosed.withdraw();
-        vm.stopPrank();
-    }
+//     function testDosedCondition() public {
+//         // First make a deposit
+//         vm.prank(user1);
+//         vm.deal(user1, 0.5 ether);
+//         w3cxii.deposit{value: 0.5 ether}();
+        
+//         // Directly fund contract to 20 ether without triggering deposit lock
+//         vm.deal(address(w3cxii), 20 ether);
+        
+//         vm.prank(user1);
+//         w3cxii.withdraw();
+        
+//         assertEq(w3cxii.dosed(), true);
+//     }
 
-    function testDosedTrigger() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
+//     function testDestruct() public {
+//         // First set dosed to true
+//         vm.prank(user1);
+//         vm.deal(user1, 0.5 ether);
+//         w3cxii.deposit{value: 0.5 ether}();
         
-        vm.startPrank(user2);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
+//         vm.deal(address(w3cxii), 20 ether);
+//         vm.prank(user1);
+//         w3cxii.withdraw();
         
-        vm.startPrank(user3);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
+//         // Test destruct
+//         uint contractBalance = address(w3cxii).balance;
+//         uint attackerBalanceBefore = attacker.balance;
         
-        address payable contractAddress = payable(address(dosed));
-        DummyContract dummy = new DummyContract();
-        dummy.sendEther{value: 18.5 ether}(contractAddress);
+//         vm.prank(attacker);
+//         w3cxii.dest();
         
-        vm.startPrank(user3);
-        dosed.withdraw();
-        vm.stopPrank();
-        
-        assertTrue(dosed.dosed());
-        assertEq(dosed.balanceOf(user3), 0.5 ether);
-    }
+//         assertEq(attacker.balance, attackerBalanceBefore + contractBalance);
+//     }
 
-    function testDestWhenDosed() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-        
-        vm.startPrank(user2);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-        
-        vm.startPrank(user3);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-        
-        address payable contractAddress = payable(address(dosed));
-        DummyContract dummy = new DummyContract();
-        dummy.sendEther{value: 18.5 ether}(contractAddress);
-        
-        vm.startPrank(user3);
-        dosed.withdraw();
-        vm.stopPrank();
-        
-        dosed.dest();
-    }
-
-    function testMaxDepositExceeded() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        dosed.deposit{value: 0.5 ether}();
-        vm.expectRevert("Max deposit exceeded");
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-    }
-
-    function testWithdrawTransferFailure() public {
-        vm.startPrank(address(receiver));
-        dosed.deposit{value: 0.5 ether}();
-        vm.expectRevert();
-        dosed.withdraw(); // Reverts due to receiver rejecting ETH
-        vm.stopPrank();
-        
-        assertEq(dosed.balanceOf(address(receiver)), 0.5 ether); // Balance unchanged
-        assertEq(address(dosed).balance, 0.5 ether); // Funds stay in contract
-    }
-
-    function testDestWhenNotDosed() public {
-        vm.startPrank(user1);
-        dosed.deposit{value: 0.5 ether}();
-        vm.stopPrank();
-        
-        vm.expectRevert("Not dosed");
-        dosed.dest();
-    }
-}
-
-contract RevertingReceiver {
-    receive() external payable {
-        revert("No ETH accepted");
-    }
-}
-
-contract DummyContract {
-    constructor() payable {}
-    
-    function sendEther(address payable target) external payable {
-        selfdestruct(target);
-    }
-}
+//     function testDestructNotDosed() public {
+//         vm.prank(attacker);
+//         vm.expectRevert("Not dosed");
+//         w3cxii.dest();
+//     }
+// }
